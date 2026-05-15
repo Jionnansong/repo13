@@ -6,7 +6,7 @@ const { initDatabase } = require('./seeders/initDb');
 const apiRoutes = require('./routes/api');
 
 const app = express();
-const PORT = process.env.PORT || 8213;
+const PORT = process.env.PORT || 8081;
 
 // Logger
 app.use(morgan('combined'));
