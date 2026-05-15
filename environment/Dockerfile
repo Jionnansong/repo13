@@ -18,7 +18,7 @@ RUN npm run build
 # 阶段 2: 运行后端 Express 服务，并通过 Nginx 独立暴露前端端口
 # ==========================================
 FROM ${NODE_IMAGE}
-WORKDIR /app/backend
+WORKDIR /app/repo
 
 # 使用国内 Debian 源安装 Nginx 与 node-gyp 编译依赖
 RUN sed -i 's|https://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g; s|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g; s|https://security.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|http://security.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|https://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
@@ -27,12 +27,14 @@ RUN sed -i 's|https://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g; 
     && rm -rf /var/lib/apt/lists/*
 
 # 复制后端 package.json 并安装依赖
-COPY repo/backend/package*.json ./
+COPY repo/backend/package*.json ./backend/
+WORKDIR /app/repo/backend
 RUN npm config set registry https://registry.npmmirror.com
 RUN npm install
 
-# 复制后端源码
-COPY repo/backend/ ./
+# 复制完整仓库源码，确保通过 SSH 下载时包含前端、后端与项目配置
+WORKDIR /app/repo
+COPY repo/ ./
 
 # 从前端构建阶段拷贝打包好的静态文件
 COPY --from=frontend-builder /app/frontend/dist/ /usr/share/nginx/html/
@@ -73,7 +75,7 @@ ENV PORT=8081
 ENV NODE_ENV=production
 
 # 启动后端 API 与前端 Nginx 服务
-CMD ["sh", "-c", "node src/app.js & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "cd /app/repo/backend && node src/app.js & nginx -g 'daemon off;'"]
 
 
 
