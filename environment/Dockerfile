@@ -19,11 +19,12 @@ RUN npm run build
 # ==========================================
 FROM ${NODE_IMAGE}
 WORKDIR /app/repo
+ARG GIT_REMOTE_URL=git@github.com:Jionnansong/repo13.git
 
-# 使用国内 Debian 源安装 Nginx 与 node-gyp 编译依赖
+# 使用国内 Debian 源安装 Nginx、Git、SSH 客户端与 node-gyp 编译依赖
 RUN sed -i 's|https://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g; s|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g; s|https://security.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|http://security.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|https://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g; s|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
     && apt-get update \
-    && apt-get install -y --no-install-recommends nginx python3 make g++ \
+    && apt-get install -y --no-install-recommends nginx git openssh-client python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制后端 package.json 并安装依赖
@@ -65,6 +66,32 @@ RUN printf '%s\n' \
 
 # 创建 SQLite 数据存储目录并设置权限
 RUN mkdir -p data
+
+# 让容器内的 Git 默认使用 SSH，并自动接受首次连接的新主机指纹
+RUN mkdir -p /root/.ssh \
+    && chmod 700 /root/.ssh \
+    && git config --system core.sshCommand "ssh -o StrictHostKeyChecking=accept-new" \
+    && git config --system user.name "super" \
+    && git config --system user.email "superpansp@163.com"
+
+# 在镜像内初始化仓库并绑定远程 origin，便于 SSH 登录后直接 git push / git pull
+RUN git init -b main \
+    && git remote add origin "${GIT_REMOTE_URL}" \
+    && printf '%s\n' \
+        'node_modules/' \
+        '**/node_modules/' \
+        'data/' \
+        'backend/data/' \
+        'dist/' \
+        '**/dist/' \
+        'build/' \
+        '**/build/' \
+        '.DS_Store' \
+        '**/.DS_Store' \
+        '*.log' \
+        > .git/info/exclude \
+    && git add . \
+    && git commit -m "chore: initial snapshot"
 
 # 分别暴露前端端口 (3000) 与后端端口 (8081)
 EXPOSE 3000
